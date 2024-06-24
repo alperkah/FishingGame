@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 
 # Pygame start
 pygame.init()
@@ -54,6 +55,18 @@ score = 0
 lives = 3
 font = pygame.font.Font(None, 36)
 game_over = False
+difficulty_timer = 0
+fish_spawn_rate = 60
+
+# Sound effects
+try:
+    catch_sound = pygame.mixer.Sound('catch.wav')
+    lose_life_sound = pygame.mixer.Sound('lose_life.wav')
+    game_over_sound = pygame.mixer.Sound('game_over.wav')
+    pygame.mixer.music.load('background_music.mp3')
+    pygame.mixer.music.play(-1)  # Loop background music
+except pygame.error as e:
+    print(f"Sound loading error: {e}")
 
 def create_fish():
     fish_type = random.choice(fish_types)
@@ -88,6 +101,7 @@ while running:
                 lives = 3
                 fishes.clear()
                 game_over = False
+                pygame.mixer.music.play(-1)  # Restart background music
 
     if not game_over:
         # Button controls
@@ -105,10 +119,15 @@ while running:
         fishing_line["x"] = boat.centerx
 
         # Create new fish
-        if random.randint(1, 60) == 1:  # Her saniye 1/60 olasılık
+        if random.randint(1, fish_spawn_rate) == 1:  # Her saniye 1/fish_spawn_rate olasılık
             create_fish()
 
-        # Move fishes and catch colntrol
+        # Increase difficulty over time
+        difficulty_timer += 1
+        if difficulty_timer % 600 == 0:  # Every 10 seconds
+            fish_spawn_rate = max(10, fish_spawn_rate - 5)
+
+        # Move fishes and catch control
         for fish in fishes[:]:
             fish["rect"].x += fish["type"]["speed"] * fish["direction"]
 
@@ -121,10 +140,44 @@ while running:
                 if fish["type"]["dangerous"]:
                     lives -= 1
                     fishing_line["length"] = 0  # Fishing line cracked
+                    try:
+                        lose_life_sound.play()
+                    except NameError:
+                        pass
                     if lives <= 0:
                         game_over = True
+                        if pygame.mixer.music.get_busy():
+                            pygame.mixer.music.stop()
+                        try:
+                            game_over_sound.play()
+                        except NameError:
+                            pass
                 else:
                     score += fish["type"]["points"]
+                    try:
+                        catch_sound.play()
+                    except NameError:
+                        pass
+                fishes.remove(fish)
+            elif (fish["type"]["dangerous"] and
+                  fishing_line["y"] < fish["rect"].bottom and
+                  fishing_line["y"] + fishing_line["length"] > fish["rect"].top and
+                  fishing_line["x"] > fish["rect"].left and
+                  fishing_line["x"] < fish["rect"].right):
+                lives -= 1
+                fishing_line["length"] = 0  # Fishing line cracked
+                try:
+                    lose_life_sound.play()
+                except NameError:
+                    pass
+                if lives <= 0:
+                    game_over = True
+                    if pygame.mixer.music.get_busy():
+                        pygame.mixer.music.stop()
+                    try:
+                        game_over_sound.play()
+                    except NameError:
+                        pass
                 fishes.remove(fish)
 
     # Draw the scene
